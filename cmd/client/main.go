@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -39,10 +37,45 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Client connection Succesful!")
-	// wait for ctrl+c
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
-	fmt.Println("\nSIGIN received, shutting down...")
+	gameState := gamelogic.NewGameState(username)
+
+loop:
+	for {
+		input := gamelogic.GetInput()
+		if len(input) < 1 {
+			log.Println("Please enter a command")
+		}
+		switch input[0] {
+		case "spawn":
+			if err := gameState.CommandSpawn(input); err != nil {
+				log.Println(err)
+				continue
+			}
+		case "move":
+			_, err := gameState.CommandMove(input)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+		case "status":
+			gameState.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "quit":
+			gamelogic.PrintQuit()
+			break loop
+		case "spam":
+			log.Println("Spamming not allowed yet!")
+		default:
+			log.Println("Please enter a valid command.")
+		}
+	}
 }
+
+// 	fmt.Println("Client connection Succesful!")
+// 	// wait for ctrl+c
+// 	signalChan := make(chan os.Signal, 1)
+// 	signal.Notify(signalChan, os.Interrupt)
+// 	<-signalChan
+// 	fmt.Println("\nSIGIN received, shutting down...")
+// }

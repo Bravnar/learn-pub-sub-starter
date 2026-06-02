@@ -41,6 +41,11 @@ func main() {
 		log.Fatal("failed to create channel:", err)
 	}
 
+	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.QueueTypeDurable)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Println("Amqp Connection Successful!")
 loop:
 	for {
