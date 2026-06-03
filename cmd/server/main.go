@@ -11,7 +11,8 @@ import (
 )
 
 func runCommand(msg, command string, channel *amqp.Channel) {
-	isPaused := command == "resume"
+	isPaused := command != "resume"
+	log.Println(isPaused)
 	log.Println(msg)
 	if err := pubsub.PublishJSON(
 		channel,
@@ -57,7 +58,7 @@ loop:
 		case "pause":
 			runCommand("running pause command...", "pause", ch)
 		case "resume":
-			runCommand("running resume command...", "command", ch)
+			runCommand("running resume command...", "resume", ch)
 		case "quit":
 			log.Println("Exiting...")
 			break loop
