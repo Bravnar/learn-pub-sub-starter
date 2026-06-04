@@ -18,6 +18,13 @@ func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) {
 	}
 }
 
+func handlerMove(gs *gamelogic.GameState) func(gamelogic.ArmyMove) {
+	return func(am gamelogic.ArmyMove) {
+		defer fmt.Print("> ")
+		gs.HandleMove(am)
+	}
+}
+
 func main() {
 	fmt.Println("Starting Peril client...")
 
@@ -27,6 +34,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer amqpConnection.Close()
+
+	ch, err := amqpConnection.Channel()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ch.Close()
 
 	username, err := gamelogic.ClientWelcome()
 	if err != nil {
@@ -46,6 +59,17 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := pubsub.SubscribeJSON(
+		amqpConnection,
+		routing.ExchangePerilTopic,
+		fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
+		routing.ArmyMovesPrefix+".*",
+		pubsub.QueueTypeTransient,
+		handlerMove(gameState),
+	); err != nil {
+		log.Fatal(err)
+	}
+
 loop:
 	for {
 		input := gamelogic.GetInput()
@@ -60,8 +84,18 @@ loop:
 				continue
 			}
 		case "move":
-			_, err := gameState.CommandMove(input)
+			armyMove, err := gameState.CommandMove(input)
 			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			if err := pubsub.PublishJSON(
+				ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf("%s.%s", routing.ArmyMovesPrefix, username),
+				armyMove,
+			); err != nil {
 				log.Println(err)
 				continue
 			}
@@ -79,11 +113,3 @@ loop:
 		}
 	}
 }
-
-// 	fmt.Println("Client connection Succesful!")
-// 	// wait for ctrl+c
-// 	signalChan := make(chan os.Signal, 1)
-// 	signal.Notify(signalChan, os.Interrupt)
-// 	<-signalChan
-// 	fmt.Println("\nSIGIN received, shutting down...")
-// }
