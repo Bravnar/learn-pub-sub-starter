@@ -41,7 +41,9 @@ func DeclareAndBind(
 		isAutoDelete,
 		isExclusive,
 		false,
-		nil,
+		amqp.Table{
+			"x-dead-letter-exchange": "peril_dlx",
+		},
 	)
 	if err != nil {
 		return &amqp.Channel{}, amqp.Queue{}, err
