@@ -14,13 +14,14 @@ const (
 	NackDiscard
 )
 
-func SubscribeJSON[T any](
+func subscribe[T any](
 	conn *amqp.Connection,
 	exchange,
 	queueName,
 	key string,
-	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	queueType SimpleQueueType,
 	handler func(T) Acktype,
+	unmarshaller func([]byte) (T, error),
 ) error {
 	ch, queue, err := DeclareAndBind(conn, exchange, queueName, key, queueType)
 	if err != nil {
@@ -41,8 +42,8 @@ func SubscribeJSON[T any](
 	}
 	go func() {
 		for chann := range deliveryChan {
-			var target T
-			if err := json.Unmarshal(chann.Body, &target); err != nil {
+			target, err := unmarshaller(chann.Body)
+			if err != nil {
 				continue
 			}
 			ackType := handler(target)
@@ -65,5 +66,28 @@ func SubscribeJSON[T any](
 			}
 		}
 	}()
+	return nil
+}
+
+func decodeJSON[T any](data []byte) (T, error) {
+	var target T
+	if err := json.Unmarshal(data, &target); err != nil {
+		return target, err
+	}
+	return target, nil
+}
+
+func SubscribeJSON[T any](
+	conn *amqp.Connection,
+	exchange,
+	queueName,
+	key string,
+	queueType SimpleQueueType, // an enum to represent "durable" or "transient"
+	handler func(T) Acktype,
+) error {
+	err := subscribe(conn, exchange, queueName, key, queueType, handler, decodeJSON)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -42,9 +42,28 @@ func main() {
 		log.Fatal("failed to create channel:", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.QueueTypeDurable)
+	// _, _, err = pubsub.DeclareAndBind(amqpConnection, routing.ExchangePerilTopic, routing.GameLogSlug, routing.GameLogSlug+".*", pubsub.QueueTypeDurable)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	err = pubsub.SubscribeGob(
+		amqpConnection,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		"game_logs.*",
+		pubsub.QueueTypeDurable,
+		func(log routing.GameLog) pubsub.Acktype {
+			defer fmt.Print("> ")
+			err := gamelogic.WriteLog(log)
+			if err != nil {
+				return pubsub.NackDiscard
+			}
+			return pubsub.Ack
+		},
+	)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to subscribe to gob")
 	}
 
 	fmt.Println("Amqp Connection Successful!")
