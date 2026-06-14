@@ -11,63 +11,6 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-func handlerPause(gs *gamelogic.GameState) func(routing.PlayingState) pubsub.Acktype {
-	return func(ps routing.PlayingState) pubsub.Acktype {
-		defer fmt.Print("> ")
-		gs.HandlePause(ps)
-		return pubsub.Ack
-	}
-}
-
-func handlerWar(gs *gamelogic.GameState) func(gamelogic.RecognitionOfWar) pubsub.Acktype {
-	return func(war gamelogic.RecognitionOfWar) pubsub.Acktype {
-		defer fmt.Print("> ")
-		outcome, _, _ := gs.HandleWar(war)
-		switch outcome {
-		case gamelogic.WarOutcomeNotInvolved:
-			return pubsub.NackRequeue
-		case gamelogic.WarOutcomeNoUnits:
-			return pubsub.NackDiscard
-		case gamelogic.WarOutcomeOpponentWon:
-			return pubsub.Ack
-		case gamelogic.WarOutcomeDraw:
-			return pubsub.Ack
-		case gamelogic.WarOutcomeYouWon:
-			return pubsub.Ack
-		default:
-			log.Println("error occured")
-			return pubsub.NackDiscard
-		}
-	}
-}
-
-func handlerMove(gs *gamelogic.GameState, chann *amqp.Channel) func(gamelogic.ArmyMove) pubsub.Acktype {
-	return func(am gamelogic.ArmyMove) pubsub.Acktype {
-		defer fmt.Print("> ")
-		outcome := gs.HandleMove(am)
-		if outcome == gamelogic.MoveOutComeSafe {
-			return pubsub.Ack
-		}
-		if outcome == gamelogic.MoveOutcomeMakeWar {
-			err := pubsub.PublishJSON(
-				chann,
-				routing.ExchangePerilTopic,
-				fmt.Sprintf("%s.%s", routing.WarRecognitionsPrefix, gs.GetUsername()),
-				gamelogic.RecognitionOfWar{
-					Attacker: am.Player,
-					Defender: gs.GetPlayerSnap(),
-				},
-			)
-			if err != nil {
-				log.Println(err)
-				return pubsub.NackRequeue
-			}
-			return pubsub.Ack
-		}
-		return pubsub.NackDiscard
-	}
-}
-
 func main() {
 	fmt.Println("Starting Peril client...")
 
@@ -119,7 +62,7 @@ func main() {
 		"war",
 		routing.WarRecognitionsPrefix+".*",
 		pubsub.QueueTypeDurable,
-		handlerWar(gameState),
+		handlerWar(gameState, ch),
 	); err != nil {
 		log.Fatal(err)
 	}
