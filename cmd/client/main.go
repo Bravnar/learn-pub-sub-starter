@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -104,7 +106,32 @@ loop:
 			gamelogic.PrintQuit()
 			break loop
 		case "spam":
-			log.Println("Spamming not allowed yet!")
+			if len(input) != 2 {
+				log.Println("usage 'spam N' where N is the number of messages")
+				continue
+			}
+			n, err := strconv.Atoi(input[1])
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			for range n {
+				maliciousLog := gamelogic.GetMaliciousLog()
+				err := pubsub.PublishGob(
+					ch,
+					"peril_topic",
+					fmt.Sprintf("%s.%s", routing.GameLogSlug, username),
+					routing.GameLog{
+						CurrentTime: time.Now(),
+						Message:     maliciousLog,
+						Username:    username,
+					},
+				)
+				if err != nil {
+					log.Println("failed to generate maliciousLog")
+				}
+			}
+
 		default:
 			log.Println("Please enter a valid command.")
 		}
